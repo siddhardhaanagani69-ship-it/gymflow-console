@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GymFlow Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky top bar with three views (Overview / Members / Query Pack); content in a 1180px column. */
+:root {
+  --bg: #f5f7f9; --panel: #ffffff; --ink: #121a22; --ink-2: #4b5866; --muted: #7a8794;
+  --line: #dde3e9; --accent: #2a78d6; --accent-soft: #e4effb; --code-bg: #eef2f6; --glow: #2a78d633; --glow-2: #1baf7a26; --shadow: #12304f33;
+  --good: #0b7a3e; --warn: #a76200; --bad: #c03636;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1418; --panel: #172027; --ink: #eef2f5; --ink-2: #b4c0cb; --muted: #8494a2;
+  --line: #2a3640; --accent: #3987e5; --accent-soft: #1b2e44; --code-bg: #111a20; --glow: #3987e540; --glow-2: #199e7030; --shadow: #00000099;
+  --good: #3fbf78; --warn: #e0a640; --bad: #ef6b6b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1418; --panel: #172027; --ink: #eef2f5; --ink-2: #b4c0cb; --muted: #8494a2;
+  --line: #2a3640; --accent: #3987e5; --accent-soft: #1b2e44; --code-bg: #111a20; --glow: #3987e540; --glow-2: #199e7030; --shadow: #00000099;
+  --good: #3fbf78; --warn: #e0a640; --bad: #ef6b6b; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--panel) 72%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding-block: 10px; }
+.brand { font: 700 26px/1 var(--display); letter-spacing: .02em; text-transform: uppercase; }
+.brand span { color: var(--accent); }
+nav { display: flex; gap: 4px; }
+nav a { font-weight: 500; color: var(--ink-2); text-decoration: none; padding: 6px 12px; border-radius: 6px; }
+nav a:hover { color: var(--ink); background: var(--accent-soft); }
+nav a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main .wrap { padding-block: 24px 48px; display: grid; gap: 24px; }
+h1, h2 { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h1 { font-size: 34px; line-height: 1.05; }
+h2 { font-size: 20px; }
+.sub { color: var(--ink-2); margin: 4px 0 0; max-width: 70ch; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.tile b { display: block; font: 700 36px/1.1 var(--display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile small { color: var(--ink-2); }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.card header-row { display: block; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink-2); font: 12px var(--body); font-variant-numeric: tabular-nums; }
+.chart .val { fill: var(--ink); font-weight: 600; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .bar { fill: var(--accent); }
+.chart .hit { fill: transparent; cursor: default; }
+.chart .hit:hover + .bar, .chart g:hover .bar { fill-opacity: .75; }
+#tip { position: fixed; pointer-events: none; z-index: 20; background: var(--ink); color: var(--bg); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.filters label { display: grid; gap: 2px; font-size: 12px; color: var(--ink-2); }
+input, select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+input[type=search] { width: 240px; max-width: 100%; }
+.count { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); max-height: 70vh; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--panel); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+td.n, th.n { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.chip { display: inline-block; font-size: 12px; font-weight: 500; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.chip.Normal { color: var(--good); } .chip.Underweight, .chip.Overweight { color: var(--warn); } .chip.Obese { color: var(--bad); }
+
+.qp { display: grid; grid-template-columns: 280px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 760px) { .qp { grid-template-columns: 1fr; } }
+.qlist { display: grid; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.qlist .sec { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 8px 2px; }
+.qlist button { all: unset; display: flex; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
+.qlist button b { font-family: var(--mono); font-weight: 500; color: var(--muted); min-width: 28px; }
+.qlist button:hover { background: var(--accent-soft); color: var(--ink); }
+.qlist button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.qlist button[aria-pressed="true"] b { color: var(--accent); }
+pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: 13px/1.55 var(--mono); color: var(--ink); }
+.kw { color: var(--accent); font-weight: 500; }
+.err { display: grid; gap: 4px; border-left: 3px solid var(--bad); background: var(--panel); border-radius: 0 8px 8px 0; padding: 10px 14px; }
+.err code { font-family: var(--mono); font-size: 13px; color: var(--bad); }
+.pipe { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.pipe div { flex: 1 1 150px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: grid; }
+.pipe b { font: 700 28px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.pipe span { font-size: 12.5px; color: var(--ink-2); }
+.pipe .bad b { color: var(--bad); }
+.pipe i { align-self: center; font-style: normal; color: var(--muted); }
+.er { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ent { flex: 1 1 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.ent h3 { margin: 0; padding: 8px 12px; font: 600 14px var(--mono); background: var(--accent-soft); color: var(--accent); }
+.ent ul { list-style: none; margin: 0; padding: 8px 12px; font: 12.5px/1.7 var(--mono); }
+.ent em { font-style: normal; display: inline-block; min-width: 28px; font-size: 11px; font-weight: 600; color: var(--warn); }
+.rel { font: 600 12px var(--mono); color: var(--muted); text-align: center; }
+form.lab { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+form.lab label { display: grid; gap: 2px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+form.lab input, form.lab select { width: 100%; box-sizing: border-box; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.btn { font: 500 14px var(--body); border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+button.btn.ghost { background: transparent; color: var(--accent); }
+.ok { display: grid; gap: 4px; border-left: 3px solid var(--good); background: var(--panel); border-radius: 0 8px 8px 0; padding: 10px 14px; }
+.ok code { font-family: var(--mono); font-size: 13px; color: var(--good); }
+.insight { font-weight: 500; }
+#demo-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: var(--bg); padding-bottom: env(safe-area-inset-bottom, 0px); }
+#demo-bar .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding-block: 12px; }
+#demo-bar p { margin: 0; flex: 1 1 300px; font-size: 16px; font-weight: 500; }
+#demo-bar .eyebrow { color: inherit; opacity: .7; }
+#demo-bar .btn.ghost { color: var(--bg); border-color: var(--bg); }
+.demo-hl { outline: 3px solid var(--accent) !important; outline-offset: 4px; border-radius: 8px; transition: outline-color .2s; }
+body.demo main { padding-bottom: 120px; }
+/* ---------- cinematic layer ---------- */
+.aura { position: fixed; inset: -25vmax; z-index: -1; pointer-events: none;
+  background: radial-gradient(38vmax 28vmax at 22% 18%, var(--glow), transparent 70%), radial-gradient(34vmax 30vmax at 82% 34%, var(--glow-2), transparent 70%), radial-gradient(30vmax 24vmax at 50% 95%, var(--glow), transparent 70%);
+  animation: drift 36s linear infinite alternate; }
+@keyframes drift { to { transform: translate3d(5vmax, 3vmax, 0) rotate(10deg); } }
+.hero { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; padding: 28px 24px 0;
+  background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--panel) 85%, transparent) 62%); display: grid; gap: 6px; }
+.hero h1 { font-size: clamp(56px, 10vw, 104px); line-height: .88; letter-spacing: .01em; }
+.hero h1 span { color: var(--accent); }
+.hero .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.beat { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); animation: beat 0.84s var(--ease-out) infinite; }
+@keyframes beat { 0% { transform: scale(1); opacity: 1; } 18% { transform: scale(1.45); opacity: .7; } 100% { transform: scale(1); opacity: 1; } }
+.ecg { width: calc(100% + 48px); margin: 6px -24px 0; height: 92px; display: block; }
+.ecg path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ecg .base { stroke: var(--line); }
+.ecg .trace { stroke: var(--accent); stroke-dasharray: 220 1780; animation: trace 3.4s linear infinite; filter: drop-shadow(0 0 6px var(--accent)); }
+@keyframes trace { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+.enter > * { animation: rise .7s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.985); } }
+.chart .bar-h { transform-box: fill-box; transform-origin: left center; animation: growX .9s var(--ease-out) backwards; animation-delay: calc(250ms + var(--d) * 60ms); }
+.chart .bar-v { transform-box: fill-box; transform-origin: center bottom; animation: growY .9s var(--ease-out) backwards; animation-delay: calc(250ms + var(--d) * 45ms); }
+@keyframes growX { from { transform: scaleX(.02); } }
+@keyframes growY { from { transform: scaleY(.02); } }
+.err, .ok { animation: rise .35s var(--ease-out) backwards; }
+.btn { transition: transform 140ms var(--ease-out), background-color 200ms ease; }
+.btn:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) {
+  .tile, .chart.card { transition: transform 250ms var(--ease-out), box-shadow 250ms var(--ease-out); }
+  .tile:hover, .chart.card:hover { transform: translateY(-3px); box-shadow: 0 14px 34px -16px var(--shadow); }
+}
+nav a[aria-current="page"] { view-transition-name: tab; }
+::view-transition-group(tab) { animation-duration: 320ms; animation-timing-function: var(--ease-in-out); }
+::view-transition-old(root) { animation: vt-out 200ms var(--ease-out) both; }
+::view-transition-new(root) { animation: none; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) {
+  .aura, .beat, .chart .bar-h, .chart .bar-v { animation: none; }
+  .ecg .trace { animation: none; stroke-dasharray: none; filter: none; }
+  .enter > *, .err, .ok { animation: fade .3s ease backwards; }
+  ::view-transition-old(root), ::view-transition-group(tab) { animation-duration: 1ms; }
+  .tile:hover, .chart.card:hover, .btn:active { transform: none; }
+}
+@keyframes fade { from { opacity: 0; } }
+footer { color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <div class="brand">Gym<span>Flow</span></div>
+  <nav>
+    <a href="#overview">Overview</a>
+    <a href="#members">Members</a>
+    <a href="#schema">Schema &amp; rules</a>
+    <a href="#queries">Query Pack</a>
+  </nav>
+  <span class="chip" id="mode" style="margin-left:auto;color:var(--muted)">Snapshot data</span>
+  <button class="btn" id="demo-btn" title="Play the guided demo (Shift+D)">▶ Play demo</button>
+</div></header>
+
+<main><div class="wrap" id="app"><p class="sub">Loading the gymflow database…</p></div></main>
+<div class="aura" aria-hidden="true"></div>
+<div id="tip" hidden></div>
+<div id="demo-bar" hidden><div class="wrap"><span id="demo-step" class="eyebrow"></span><p id="demo-say"></p><button class="btn ghost" id="demo-stop">Stop demo</button></div></div>
+
+<script>
+let D, P, T, M, S, byMember;
+const $ = s => document.querySelector(s);
+const esc = v => String(v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// MySQL ROUND on DECIMAL rounds half away from zero; the tiny nudge absorbs float error.
+const rnd = (x, d = 0) => { const f = 10 ** d; return Math.sign(x) * Math.round(Math.abs(x) * f * (1 + 1e-12)) / f; };
+const fx = (x, d) => rnd(x, d).toFixed(d);
+const avg = a => a.reduce((s, v) => s + v, 0) / a.length;
+const nf = n => n.toLocaleString('en-US');
+const LEVELS = ['Beginner', 'Intermediate', 'Expert'], BMIC = ['Underweight', 'Normal', 'Overweight', 'Obese'];
+const bmiCat = b => b < 18.5 ? 'Underweight' : b < 25 ? 'Normal' : b < 30 ? 'Overweight' : 'Obese';
+const name = m => m.fn + ' ' + m.ln;
+const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const ci = (a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' });
+const groupBy = (arr, key) => { const g = new Map(); for (const r of arr) { const k = key(r); if (!g.has(k)) g.set(k, []); g.get(k).push(r); } return g; };
+
+let LIVE = false;
+const api = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+const reload = () => fetch('data.json').then(r => r.json()).then(load);
+function load(d) {
+  D = d;
+  P = new Map(d.plans.map(([id, name, dur, price]) => [id, { id, name, dur, price }]));
+  T = new Map(d.types.map(([id, name]) => [id, { id, name }]));
+  M = d.members.map(([id, fn, ln, age, g, h, w, bmi, lvl, freq, plan]) => ({ id, fn, ln, age, g, h, w, bmi, lvl, freq, plan }));
+  S = d.sessions.map(([id, mid, tid, date, dur, cal, max, avgb, rest, fat, water]) => ({ id, mid, tid, date, dur, cal, max, avg: avgb, rest, fat, water }));
+  const mById = new Map(M.map(m => [m.id, m]));
+  for (const s of S) { s.m = mById.get(s.mid); s.t = T.get(s.tid).name; }
+  byMember = groupBy(S, s => s.mid);
+}
+// On the local server (server.py) /api/health answers and every view reads and writes the live gymflow database.
+fetch('api/health').then(r => r.json()).then(hh => { if (hh.ok) { LIVE = true;
+  $('#mode').textContent = `● Live: ${hh.server} · ${hh.database}`; $('#mode').style.color = 'var(--good)'; } }).catch(() => {})
+.then(reload).then(() => {
+  addEventListener('hashchange', route); route();
+  if (location.hash === '#demo') demo();
+}).catch(() => { $('#app').innerHTML = '<p class="sub">Could not load data.json. Open this page from a web server (for example <code>python3 -m http.server</code> in this folder) so the browser can read the data file.</p>'; });
+
+function route() {
+  const v = ['overview', 'members', 'schema', 'queries'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
+  document.querySelectorAll('nav a').forEach(a => a.hash === '#' + v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  const render = () => { ({ overview, members, schema, queries })[v](); scrollTo(0, 0);
+    const app = $('#app'); app.classList.remove('enter'); void app.offsetWidth;
+    [...app.children].forEach((el, i) => el.style.setProperty('--i', i)); app.classList.add('enter'); countUp(); };
+  document.startViewTransition && !reduce ? document.startViewTransition(render) : render();
+}
+// KPI numbers count up from zero; the final value is already in the DOM, so the page is complete at rest.
+function countUp() {
+  if (reduce) return;
+  document.querySelectorAll('[data-to]').forEach(el => {
+    const to = +el.dataset.to, pre = el.dataset.pre || '', t0 = performance.now(), dur = 1400;
+    const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(2, -10 * k);
+      el.textContent = pre + nf(Math.round(to * (k === 1 ? 1 : e))); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+// ECG trace for the hero: one PQRST complex every 150 units.
+const ecgPath = (() => { let d = 'M0 60'; for (let x = 0; x < 600; x += 150)
+  d += ` L${x + 30} 60 Q${x + 38} 52 ${x + 46} 60 L${x + 56} 60 L${x + 60} 66 L${x + 66} 10 L${x + 72} 76 L${x + 78} 60 L${x + 92} 60 Q${x + 104} 46 ${x + 116} 60 L${x + 150} 60`;
+  return d; })();
+
+/* ---------- tooltip + horizontal/vertical bar charts (single series, one hue) ---------- */
+const tip = $('#tip');
+document.addEventListener('pointermove', e => {
+  const t = e.target.closest?.('[data-tip]');
+  if (!t) { tip.hidden = true; return; }
+  tip.textContent = t.dataset.tip; tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.min(e.clientX + 12, innerWidth - r.width - 8) + 'px';
+  tip.style.top = (e.clientY - r.height - 10) + 'px';
+});
+
+function hbars(rows, fmt) { // rows: [label, value, tooltip]
+  const W = 460, L = 96, R = 56, rowH = 30, H = rows.length * rowH;
+  const max = Math.max(...rows.map(r => r[1]));
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${rows.map(([lab, v, t], i) => {
+    const y = i * rowH, w = Math.max(2, (v / max) * (W - L - R));
+    return `<g data-tip="${esc(t)}"><rect class="hit" x="0" y="${y}" width="${W}" height="${rowH}"/>
+      <text x="${L - 10}" y="${y + rowH / 2 + 4}" text-anchor="end">${esc(lab)}</text>
+      <rect class="bar bar-h" style="--d:${i}" x="${L}" y="${y + 6}" width="${w}" height="${rowH - 12}" rx="4"/>
+      <text class="val" x="${L + w + 8}" y="${y + rowH / 2 + 4}">${fmt(v)}</text></g>`;
+  }).join('')}</svg>`;
+}
+
+function vbars(rows) { // rows: [label, value, tooltip]
+  const W = 640, H = 220, B = 24, Tp = 10, Lp = 36;
+  const max = Math.ceil(Math.max(...rows.map(r => r[1])) / 25) * 25;
+  const bw = (W - Lp) / rows.length, y = v => Tp + (H - Tp - B) * (1 - v / max);
+  const ticks = [0, max / 4, max / 2, max * 3 / 4, max];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">
+    ${ticks.map(t => `<line class="grid" x1="${Lp}" x2="${W}" y1="${y(t)}" y2="${y(t)}"/><text x="${Lp - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`).join('')}
+    ${rows.map(([lab, v, t], i) => { const x = Lp + i * bw; return `<g data-tip="${esc(t)}">
+      <rect class="hit" x="${x}" y="0" width="${bw}" height="${H}"/>
+      <rect class="bar bar-v" style="--d:${i}" x="${x + bw * .18}" y="${y(v)}" width="${bw * .64}" height="${H - B - y(v)}" rx="4"/>
+      <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${lab}</text></g>`; }).join('')}
+  </svg>`;
+}
+
+/* ---------- Overview ---------- */
+function overview() {
+  const months = [...groupBy(S, s => s.date.slice(0, 7))].sort((a, b) => cmp(a[0], b[0]));
+  const mon = d => new Date(d + '-01T00:00').toLocaleString('en-US', { month: 'short' });
+  const busiest = months.reduce((a, b) => b[1].length > a[1].length ? b : a);
+  const types = [...groupBy(S, s => s.t)].map(([t, ss]) => [t, avg(ss.map(s => s.cal)), ss.length]).sort((a, b) => b[1] - a[1]);
+  const plans = [...P.values()].map(p => { const n = M.filter(m => m.plan === p.id).length; return [p.name, n, p.price * n]; });
+  const revenue = plans.reduce((s, p) => s + p[2], 0);
+  const bmi = BMIC.map(c => [c, M.filter(m => bmiCat(m.bmi) === c).length]);
+  $('#app').innerHTML = `
+    <section class="hero">
+      <span class="eyebrow">EDS 6343 · Team 05 · Fitness club database</span>
+      <h1>Gym<span>Flow</span></h1>
+      <p class="sub">Members, workout sessions and plan revenue for 2025, read from the gymflow MySQL database.</p>
+      <span class="live"><i class="beat"></i>Average session heart rate ${fx(avg(S.map(s => s.avg)), 0)} bpm across ${nf(S.length)} sessions</span>
+      <svg class="ecg" viewBox="0 0 600 92" preserveAspectRatio="none" aria-hidden="true"><path class="base" d="${ecgPath}"/><path class="trace" pathLength="2000" d="${ecgPath}"/></svg>
+    </section>
+    <div class="tiles">
+      <div class="tile"><span class="eyebrow">Members</span><b data-to="${M.length}">${nf(M.length)}</b><small>${byMember.size} with a logged session</small></div>
+      <div class="tile"><span class="eyebrow">Sessions in 2025</span><b data-to="${S.length}">${nf(S.length)}</b><small>Busiest month: ${mon(busiest[0])} (${busiest[1].length})</small></div>
+      <div class="tile"><span class="eyebrow">Avg kcal / session</span><b data-to="${rnd(avg(S.map(s => s.cal)))}">${nf(rnd(avg(S.map(s => s.cal))))}</b><small>Avg ${fx(avg(S.map(s => s.dur)), 2)} h per session</small></div>
+      <div class="tile"><span class="eyebrow">Plan revenue</span><b data-to="${Math.round(revenue)}" data-pre="$">$${nf(Math.round(revenue))}</b><small>Sum of plan prices across members</small></div>
+    </div>
+    <div class="pipe" aria-label="Data pipeline">
+      <div><b>973</b><span>Kaggle source rows</span></div><i>→</i>
+      <div class="bad"><b>−23</b><span>Rejected: AvgBPM above MaxBPM</span></div><i>→</i>
+      <div><b>950</b><span>Validated members + sessions</span></div><i>→</i>
+      <div><b>4</b><span>3NF tables, 16 CHECK rules</span></div>
+    </div>
+    <div class="card chart"><div><h2>Sessions per month</h2><p class="sub">Sessions logged each month of 2025 (Q14)</p></div>
+      ${vbars(months.map(([k, ss]) => [mon(k), ss.length, `${mon(k)} 2025: ${ss.length} sessions, ${nf(ss.reduce((a, s) => a + s.cal, 0))} kcal`]))}</div>
+    <div class="grid2">
+      <div class="card chart"><div><h2>Calories by workout type</h2><p class="sub">Average kcal burned per session (Q8)</p></div>
+        ${hbars(types.map(([t, v, n]) => [t, v, `${t}: ${n} sessions, avg ${fx(v, 0)} kcal`]), v => fx(v, 0))}</div>
+      <div class="card chart"><div><h2>Members by plan</h2><p class="sub">Enrolled members per membership plan (Q9)</p></div>
+        ${hbars(plans.map(([p, n, r]) => [p, n, `${p}: ${n} members, $${nf(rnd(r, 2))} revenue`]), nf)}</div>
+      <div class="card chart"><div><h2>Members by BMI category</h2><p class="sub">WHO bands used by the dashboard view (Q16)</p></div>
+        ${hbars(bmi.map(([c, n]) => [c, n, `${c}: ${n} members (${fx(n / M.length * 100, 1)}%)`]), nf)}</div>
+      <div class="card chart"><div><h2>Members by experience</h2><p class="sub">Self-reported training level</p></div>
+        ${hbars(LEVELS.map(l => { const n = M.filter(m => m.lvl === l).length; return [l, n, `${l}: ${n} members`]; }), nf)}</div>
+    </div>
+    <footer>Source: Kaggle Gym Members Exercise Tracking dataset (973 rows; 23 dropped for AvgBPM above MaxBPM). Names, session dates and plan assignments are synthetic, generated with a fixed seed by generate_build.py.</footer>`;
+}
+
+/* ---------- Members ---------- */
+function members() {
+  $('#app').innerHTML = `
+    <div><h1>Member directory</h1><p class="sub">Every member with their plan, BMI category and logged session. Built on the same joins as vw_MemberDashboard.</p></div>
+    <div class="filters">
+      <label>Search<input id="f-q" type="search" placeholder="Name or member ID"></label>
+      <label>Plan<select id="f-plan"><option value="">All plans</option>${[...P.values()].map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></label>
+      <label>Level<select id="f-lvl"><option value="">All levels</option>${LEVELS.map(l => `<option>${l}</option>`).join('')}</select></label>
+      <label>BMI<select id="f-bmi"><option value="">All categories</option>${BMIC.map(c => `<option>${c}</option>`).join('')}</select></label>
+      <label>Workout<select id="f-type"><option value="">All types</option><option value="none">No session</option>${[...T.values()].map(t => `<option>${t.name}</option>`).join('')}</select></label>
+      <span class="count" id="f-count"></span>
+    </div>
+    <div class="tablebox"><table><thead><tr>
+      <th class="n">ID</th><th>Member</th><th class="n">Age</th><th>Gender</th><th>Level</th><th>Plan</th><th class="n">BMI</th><th>Category</th>
+      <th>Workout</th><th>Date</th><th class="n">Hours</th><th class="n">kcal</th><th class="n">Avg BPM</th><th class="n">Fat %</th>
+    </tr></thead><tbody id="rows"></tbody></table></div>`;
+  const draw = () => {
+    const q = $('#f-q').value.trim().toLowerCase(), plan = +$('#f-plan').value, lvl = $('#f-lvl').value, bc = $('#f-bmi').value, ty = $('#f-type').value;
+    const rows = M.filter(m => {
+      const s = byMember.get(m.id)?.[0];
+      return (!q || name(m).toLowerCase().includes(q) || String(m.id) === q) && (!plan || m.plan === plan) && (!lvl || m.lvl === lvl)
+        && (!bc || bmiCat(m.bmi) === bc) && (!ty || (ty === 'none' ? !s : s?.t === ty));
+    });
+    const shown = rows.slice(0, 300);
+    $('#f-count').textContent = rows.length > 300 ? `Showing 300 of ${nf(rows.length)} members` : `${nf(rows.length)} members`;
+    $('#rows').innerHTML = shown.map(m => { const s = byMember.get(m.id)?.[0], c = bmiCat(m.bmi); return `<tr>
+      <td class="n">${m.id}</td><td>${esc(name(m))}</td><td class="n">${m.age}</td><td>${m.g}</td><td>${m.lvl}</td><td>${P.get(m.plan).name}</td>
+      <td class="n">${m.bmi.toFixed(2)}</td><td><span class="chip ${c}">${c}</span></td>
+      ${s ? `<td>${s.t}</td><td>${s.date}</td><td class="n">${s.dur.toFixed(2)}</td><td class="n">${nf(s.cal)}</td><td class="n">${s.avg}</td><td class="n">${s.fat.toFixed(2)}</td>`
+          : '<td colspan="6" style="color:var(--muted)">No session logged</td>'}</tr>`; }).join('') || '<tr><td colspan="14">No members match these filters.</td></tr>';
+  };
+  document.querySelectorAll('.filters input, .filters select').forEach(el => el.addEventListener('input', draw));
+  draw();
+}
+
+/* ---------- Schema & rules: ER view, CHECK catalog, live integrity lab ---------- */
+const between = (a, b) => v => v >= a && v <= b;
+const RULES = [ // [table, constraint, SQL, field, test]
+  ['MembershipPlan', 'chk_plan_duration', 'DurationMonths > 0'], ['MembershipPlan', 'chk_plan_price', 'Price >= 0.00'],
+  ['Member', 'chk_member_age', 'Age BETWEEN 16 AND 100', 'age', between(16, 100)],
+  ['Member', 'chk_member_gender', "Gender IN ('Male','Female','Other')", 'g', v => ['Male', 'Female', 'Other'].includes(v)],
+  ['Member', 'chk_member_height', 'HeightM BETWEEN 1.20 AND 2.50', 'h', between(1.2, 2.5)],
+  ['Member', 'chk_member_weight', 'WeightKg BETWEEN 30.00 AND 300.00', 'w', between(30, 300)],
+  ['Member', 'chk_member_bmi', 'BMI > 0.00', 'bmi', v => v > 0],
+  ['Member', 'chk_member_level', "ExperienceLevel IN ('Beginner','Intermediate','Expert')", 'lvl', v => LEVELS.includes(v)],
+  ['Member', 'chk_member_freq', 'WorkoutFrequency BETWEEN 1 AND 7', 'freq', between(1, 7)],
+  ['WorkoutSession', 'chk_session_duration', 'DurationHours > 0.00', 'dur', v => v > 0],
+  ['WorkoutSession', 'chk_session_calories', 'CaloriesBurned >= 0', 'cal', v => v >= 0],
+  ['WorkoutSession', 'chk_session_maxbpm', 'MaxBPM BETWEEN 60 AND 220', 'max', between(60, 220)],
+  ['WorkoutSession', 'chk_session_restbpm', 'RestingBPM BETWEEN 40 AND 120', 'rest', between(40, 120)],
+  ['WorkoutSession', 'chk_session_fat', 'FatPercentage BETWEEN 3.00 AND 60.00', 'fat', between(3, 60)],
+  ['WorkoutSession', 'chk_session_water', 'WaterIntakeLiters BETWEEN 0.00 AND 10.00', 'water', between(0, 10)],
+  ['WorkoutSession', 'chk_heart_rate', 'RestingBPM <= AvgBPM AND AvgBPM <= MaxBPM', null, r => r.rest <= r.avg && r.avg <= r.max],
+];
+// Runs the same checks MySQL would, in order: NOT NULL, CHECK, then FOREIGN KEY. Returns the error text or null.
+function integrity(table, row, cols) {
+  for (const [k, c] of cols) if (row[k] === '' || Number.isNaN(row[k])) return `Error Code: 1048. Column '${c}' cannot be null`;
+  for (const [t, name, , f, test] of RULES) if (t === table && test && !test(f ? row[f] : row)) return `Error Code: 3819. Check constraint '${name}' is violated.`;
+  if (table === 'Member' && !P.has(row.plan)) return "Error Code: 1452. Cannot add or update a child row: a foreign key constraint fails (fk_member_plan)";
+  if (table === 'WorkoutSession' && !M.some(m => m.id === row.mid)) return "Error Code: 1452. Cannot add or update a child row: a foreign key constraint fails (fk_session_member)";
+  return null;
+}
+const ent = (n, rows) => `<div class="ent"><h3>${n}</h3><ul>${rows.map(([k, c]) => `<li><em>${k}</em>${c}</li>`).join('')}</ul></div>`;
+const fld = (id, label, attrs) => `<label>${label}<input id="${id}" ${attrs}></label>`;
+const sel = (id, label, opts, v) => `<label>${label}<select id="${id}">${opts.map(o => `<option value="${o[0]}"${o[0] == v ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></label>`;
+const msg = (err, okText) => err ? `<div class="err"><span class="eyebrow">Rejected by the database</span><code>${esc(err)}</code></div>` : `<div class="ok"><span class="eyebrow">Accepted</span><code>${esc(okText)}</code></div>`;
+
+function schema() {
+  $('#app').innerHTML = `
+    <div><h1>Schema &amp; business rules</h1><p class="sub">Four normalized tables in 3NF: 4 primary keys, 3 foreign keys with ON DELETE RESTRICT, 2 UNIQUE keys and 16 CHECK constraints.</p></div>
+    <div class="card"><h2>Entity relationships</h2>
+      <div class="er">
+        ${ent('MembershipPlan', [['PK', 'PlanID'], ['UQ', 'PlanName'], ['', 'DurationMonths'], ['', 'Price']])}
+        <div class="rel">1 : M<br>→</div>
+        ${ent('Member', [['PK', 'MemberID'], ['FK', 'PlanID'], ['', 'FirstName, LastName'], ['', 'Age, Gender'], ['', 'HeightM, WeightKg'], ['GEN', 'BMI'], ['', 'ExperienceLevel'], ['', 'WorkoutFrequency']])}
+        <div class="rel">1 : M<br>→</div>
+        ${ent('WorkoutSession', [['PK', 'SessionID'], ['FK', 'MemberID'], ['FK', 'WorkoutTypeID'], ['IDX', 'SessionDate'], ['', 'DurationHours'], ['', 'CaloriesBurned'], ['', 'Max/Avg/RestingBPM'], ['', 'FatPct, WaterIntakeL']])}
+        <div class="rel">M : 1<br>←</div>
+        ${ent('WorkoutType', [['PK', 'WorkoutTypeID'], ['UQ', 'TypeName']])}
+      </div>
+      <p class="sub">Every relationship is one-to-many and non-identifying. The parent side is optional (0..N), the child side mandatory (1..1). Splitting Member from WorkoutSession lets a member log any number of sessions over time.</p>
+    </div>
+    <div class="grid2">
+      <div class="card"><div><h2>Log a workout session</h2><p class="sub">Runs an INSERT into WorkoutSession through the same CHECK and foreign-key rules as MySQL.</p></div>
+        <form class="lab" id="f-sess">
+          ${fld('s-mid', 'MemberID', 'type="number" value="1"')}
+          ${sel('s-tid', 'Workout type', [...T.values()].map(t => [t.id, t.name]), 1)}
+          ${fld('s-date', 'SessionDate', 'type="date" value="2025-06-01"')}
+          ${fld('s-dur', 'DurationHours', 'type="number" step="0.01" value="1.00"')}
+          ${fld('s-cal', 'CaloriesBurned', 'type="number" value="500"')}
+          ${fld('s-max', 'MaxBPM', 'type="number" value="160"')}
+          ${fld('s-avg', 'AvgBPM', 'type="number" value="140"')}
+          ${fld('s-rest', 'RestingBPM', 'type="number" value="60"')}
+          ${fld('s-fat', 'FatPercentage', 'type="number" step="0.01" value="20.00"')}
+          ${fld('s-water', 'WaterIntakeLiters', 'type="number" step="0.01" value="2.00"')}
+        </form>
+        <div class="actions"><button class="btn" id="s-go">Insert session</button><button class="btn ghost" id="s-q17">Load Q17 example (AvgBPM 170)</button></div>
+        <div id="s-out"></div>
+      </div>
+      <div class="card"><div><h2>Enroll a member</h2><p class="sub">BMI is a stored generated column: ROUND(WeightKg / (HeightM * HeightM), 2), recomputed on every write.</p></div>
+        <form class="lab" id="f-mem">
+          ${fld('m-fn', 'FirstName', 'value="Avery"')}${fld('m-ln', 'LastName', 'value="Brooks"')}
+          ${fld('m-age', 'Age', 'type="number" value="29"')}
+          ${sel('m-g', 'Gender', [['Male', 'Male'], ['Female', 'Female'], ['Other', 'Other']], 'Female')}
+          ${fld('m-h', 'HeightM', 'type="number" step="0.01" value="1.68"')}
+          ${fld('m-w', 'WeightKg', 'type="number" step="0.1" value="63.5"')}
+          <label>BMI (generated)<input id="m-bmi" readonly tabindex="-1"></label>
+          ${sel('m-lvl', 'ExperienceLevel', LEVELS.map(l => [l, l]), 'Beginner')}
+          ${fld('m-freq', 'WorkoutFrequency', 'type="number" value="3"')}
+          ${sel('m-plan', 'Plan', [...P.values()].map(p => [p.id, p.name]), 2)}
+        </form>
+        <div class="actions"><button class="btn" id="m-go">Enroll member</button></div>
+        <div id="m-out"></div>
+      </div>
+    </div>
+    <div class="card"><div><h2>Delete a membership plan</h2><p class="sub">fk_member_plan uses ON DELETE RESTRICT, so a plan with enrolled members cannot be removed.</p></div>
+      <div class="actions">${[...P.values()].map(p => `<button class="btn ghost" data-del="${p.id}">DELETE ${p.name} (PlanID ${p.id})</button>`).join('')}</div>
+      <div id="d-out"></div>
+    </div>
+    <div class="card"><h2>CHECK constraint catalog</h2>
+      <div class="tablebox"><table><thead><tr><th>Table</th><th>Constraint</th><th>Rule</th></tr></thead>
+      <tbody>${RULES.map(([t, n, sql]) => `<tr><td>${t}</td><td><code>${n}</code></td><td><code>${esc(sql)}</code></td></tr>`).join('')}</tbody></table></div>
+    </div>
+    <footer>${LIVE ? 'Connected to your MySQL server: inserts are real and stay in the gymflow database. Rerun Team05_GymFlow_Build.sql to reset it.'
+      : "Rows you add here go into this page's in-memory copy of the tables, so they show up in Members, Overview and the Query Pack. Reloading the page restores the original build data."}</footer>`;
+
+  const num = id => $('#' + id).value === '' ? '' : +$('#' + id).value;
+  const genBmi = () => { const h = num('m-h'), w = num('m-w'); return h && w ? rnd(w / (h * h), 2) : ''; };
+  const showBmi = () => $('#m-bmi').value = genBmi() === '' ? '' : genBmi().toFixed(2);
+  ['m-h', 'm-w'].forEach(id => $('#' + id).addEventListener('input', showBmi)); showBmi();
+  document.querySelectorAll('form.lab').forEach(f => f.addEventListener('submit', e => e.preventDefault()));
+  $('#s-q17').onclick = () => { Object.entries({ 's-mid': 1, 's-tid': 1, 's-date': '2025-06-01', 's-dur': '1.00', 's-cal': 500, 's-max': 160, 's-avg': 170, 's-rest': 60, 's-fat': '20.00', 's-water': '2.00' }).forEach(([k, v]) => $('#' + k).value = v); $('#s-go').click(); };
+  $('#s-go').onclick = () => {
+    const r = { mid: num('s-mid'), tid: +$('#s-tid').value, date: $('#s-date').value, dur: num('s-dur'), cal: num('s-cal'), max: num('s-max'), avg: num('s-avg'), rest: num('s-rest'), fat: num('s-fat'), water: num('s-water') };
+    const err = integrity('WorkoutSession', r, [['mid', 'MemberID'], ['date', 'SessionDate'], ['dur', 'DurationHours'], ['cal', 'CaloriesBurned'], ['max', 'MaxBPM'], ['avg', 'AvgBPM'], ['rest', 'RestingBPM'], ['fat', 'FatPercentage'], ['water', 'WaterIntakeLiters']]);
+    if (LIVE) return api('api/session', r).then(async x => { if (!x.error) await reload();
+      const m = M.find(mm => mm.id === r.mid);
+      $('#s-out').innerHTML = msg(x.error, `MySQL: 1 row inserted, SessionID ${x.id} for ${m ? name(m) : 'member ' + r.mid} (${T.get(r.tid).name}, ${r.date})`); });
+    if (!err) { r.id = Math.max(...S.map(s => s.id)) + 1; r.m = M.find(m => m.id === r.mid); r.t = T.get(r.tid).name; S.push(r);
+      if (!byMember.has(r.mid)) byMember.set(r.mid, []); byMember.get(r.mid).push(r); }
+    $('#s-out').innerHTML = msg(err, err ? '' : `1 row inserted: SessionID ${r.id} for ${name(r.m)} (${r.t}, ${r.date})`);
+  };
+  $('#m-go').onclick = () => {
+    const r = { fn: $('#m-fn').value.trim(), ln: $('#m-ln').value.trim(), age: num('m-age'), g: $('#m-g').value, h: num('m-h'), w: num('m-w'), bmi: genBmi(), lvl: $('#m-lvl').value, freq: num('m-freq'), plan: +$('#m-plan').value };
+    const err = integrity('Member', r, [['age', 'Age'], ['h', 'HeightM'], ['w', 'WeightKg'], ['freq', 'WorkoutFrequency']]);
+    if (LIVE) return api('api/member', r).then(async x => { if (!x.error) await reload();
+      $('#m-out').innerHTML = msg(x.error, `MySQL: 1 row inserted, MemberID ${x.id}, ${name(r)}, BMI ${(+x.bmi).toFixed(2)} as stored by the database (${bmiCat(+x.bmi)})`); });
+    if (!err) { r.id = Math.max(...M.map(m => m.id)) + 1; M.push(r); }
+    $('#m-out').innerHTML = msg(err, err ? '' : `1 row inserted: MemberID ${r.id}, ${name(r)}, BMI ${r.bmi.toFixed(2)} (${bmiCat(r.bmi)}), ${P.get(r.plan).name} plan`);
+  };
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const id = +b.dataset.del, n = M.filter(m => m.plan === id).length;
+    if (LIVE) return api('api/delete-plan', { id }).then(async x => { if (!x.error) await reload(); $('#d-out').innerHTML = msg(x.error, 'MySQL: ' + x.ok); });
+    $('#d-out').innerHTML = msg(n ? `Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails (fk_member_plan). ${n} members still reference PlanID ${id}.` : null, `1 row deleted: PlanID ${id}`);
+    if (!n) P.delete(id);
+  });
+}
+
+/* ---------- Guided live demo: drives the real UI step by step ---------- */
+let demoOn = false;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = ms => new Promise((res, rej) => setTimeout(() => demoOn ? res() : rej('stopped'), ms));
+const go = async v => { location.hash = v; await wait(700); };
+const say = async (step, text, sel, ms = 3200) => {
+  $('#demo-step').textContent = step; $('#demo-say').textContent = text;
+  document.querySelectorAll('.demo-hl').forEach(e => e.classList.remove('demo-hl'));
+  const el = sel && $(sel);
+  if (el) { el.classList.add('demo-hl'); el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); }
+  await wait(ms);
+};
+const typeInto = async (sel, text) => { const el = $(sel); el.focus(); el.value = '';
+  for (const ch of text) { el.value += ch; el.dispatchEvent(new Event('input')); await wait(140); } };
+const setVal = (sel, v) => { const el = $(sel); el.value = v; el.dispatchEvent(new Event('input')); };
+const click = async (sel, ms = 600) => { $(sel).click(); await wait(ms); };
+
+async function demo() {
+  if (demoOn) return;
+  demoOn = true; document.body.classList.add('demo'); $('#demo-bar').hidden = false; $('#demo-btn').hidden = true;
+  try {
+    await go('overview');
+    await say('1 / 12 · Overview', 'GymFlow loads the four MySQL tables: 951 members and 950 workout sessions.', '.tiles');
+    await say('2 / 12 · Data cleaning', '23 of the 973 Kaggle rows were rejected because AvgBPM was above MaxBPM.', '.pipe');
+    await say('3 / 12 · Demand', 'Sessions per month in 2025. Hover any bar for that month\'s session and calorie totals.', '.chart');
+    await go('members');
+    await say('4 / 12 · Member directory', 'Staff can search all members. Typing "Smith" filters the list live.', '.filters', 900);
+    await typeInto('#f-q', 'Smith'); await wait(1600);
+    setVal('#f-q', ''); setVal('#f-bmi', 'Obese');
+    await say('5 / 12 · Health follow-up', 'Filtering to the Obese BMI category gives trainers their follow-up list.', '.tablebox');
+    setVal('#f-bmi', '');
+    await go('schema');
+    await say('6 / 12 · Schema', 'Four tables linked by three one-to-many foreign keys.', '.er');
+    await click('#s-q17', 300);
+    await say('7 / 12 · Bad data rejected', 'Logging a session with AvgBPM 170 above MaxBPM 160 fails the chk_heart_rate constraint.', '#s-out', 3600);
+    setVal('#s-avg', 140); await click('#s-go', 300);
+    await say('8 / 12 · Valid session saved', 'With AvgBPM fixed to 140 the insert passes every check and the session is saved.', '#s-out');
+    setVal('#m-w', ''); await typeInto('#m-w', '63.5');
+    await click('#m-go', 300);
+    await say('9 / 12 · Generated BMI', 'Enrolling Avery Brooks: the database works out BMI from height and weight.', '#m-out', 3600);
+    await click('[data-del="1"]', 300);
+    await say('10 / 12 · Delete protection', 'Deleting the Basic plan fails because members still use it (ON DELETE RESTRICT).', '#d-out', 3600);
+    await go('members'); await typeInto('#f-q', 'Avery');
+    await say('11 / 12 · Data flows through', 'The new member now appears in the directory.', '.tablebox');
+    await go('queries');
+    for (const [q, t] of [['Q7', 'Q7 finds members with no sessions, which now includes Avery Brooks.'], ['Q8', 'Q8 compares workout types. Cardio falls below the 900 kcal cut-off.'], ['Q14', 'Q14 is a CTE with a running total of sessions by month.']]) {
+      await click(`[data-q="${q}"]`, 200);
+      await say('12 / 12 · Query pack', t, '#qout', 3400);
+    }
+    await say('Done', 'Demo complete. Every view is live, so you can explore on your own.', null, 3000);
+  } catch (e) { if (e !== 'stopped') throw e; }
+  demoOn = false; document.body.classList.remove('demo'); $('#demo-bar').hidden = true; $('#demo-btn').hidden = false;
+  document.querySelectorAll('.demo-hl').forEach(e => e.classList.remove('demo-hl'));
+}
+// Shortcut: Shift+D (outside form fields) or open the page with #demo.
+document.addEventListener('keydown', e => { if (e.key === 'D' && e.shiftKey && !e.target.closest('input, select, textarea')) demo(); });
+document.addEventListener('click', e => { if (e.target.id === 'demo-btn') demo(); if (e.target.id === 'demo-stop') demoOn = false; });
+
+/* ---------- Query Pack: each query re-implemented over the loaded rows ---------- */
+const lvlOrd = l => LEVELS.indexOf(l);
+const Q = {
+  Q1: () => [...P.values()].sort((a, b) => a.price - b.price).map(p => [p.id, p.name, p.dur, p.price.toFixed(2), fx(p.price / p.dur, 2)]),
+  Q2: () => M.slice().sort((a, b) => ci(a.ln, b.ln) || ci(a.fn, b.fn) || a.id - b.id).slice(0, 15).map(m => [m.id, m.fn, m.ln, m.age, m.lvl, P.get(m.plan).name]),
+  Q3: () => S.slice().sort((a, b) => b.cal - a.cal || a.id - b.id).slice(0, 10).map(s => [s.id, name(s.m), s.t, s.date, s.dur.toFixed(2), s.cal]),
+  Q4: () => M.filter(m => m.plan === 3 && m.lvl === 'Expert' && m.freq >= 4).sort((a, b) => b.freq - a.freq || ci(a.ln, b.ln) || a.id - b.id).map(m => [m.id, m.fn, m.ln, m.g, m.freq]),
+  Q5: () => S.filter(s => ['HIIT', 'Strength'].includes(s.t) && s.date >= '2025-01-01' && s.date <= '2025-03-31' && s.dur > 1.5)
+    .sort((a, b) => cmp(b.date, a.date) || a.id - b.id).map(s => [s.id, s.m.fn, s.m.ln, s.t, s.date, s.dur.toFixed(2), s.max]),
+  Q6: () => S.filter(s => s.m.bmi >= 30).sort((a, b) => b.m.bmi - a.m.bmi || a.m.id - b.m.id).slice(0, 15).map(s => [s.m.id, s.m.fn, s.m.ln, s.m.age, s.m.bmi.toFixed(2), s.fat.toFixed(2)]),
+  Q7: () => M.filter(m => !byMember.has(m.id)).map(m => [m.id, m.fn, m.ln, P.get(m.plan).name]),
+  Q8: () => [...groupBy(S, s => s.t)].filter(([, ss]) => avg(ss.map(s => s.cal)) > 900).map(([t, ss]) => [t, ss.length, fx(avg(ss.map(s => s.dur)), 2), fx(avg(ss.map(s => s.cal)), 0), fx(avg(ss.map(s => s.avg)), 0)])
+    .sort((a, b) => b[3] - a[3]),
+  Q9: () => [...P.values()].map(p => { const ms = M.filter(m => m.plan === p.id); return [p.name, ms.length, (p.price * ms.length).toFixed(2), fx(avg(ms.map(m => m.freq)), 2)]; })
+    .filter(r => r[1] > 200).sort((a, b) => b[2] - a[2]),
+  Q10: () => [...groupBy(S, s => s.m.lvl + '|' + s.m.g)].filter(([, ss]) => ss.length >= 50)
+    .map(([k, ss]) => [...k.split('|'), ss.length, fx(avg(ss.map(s => s.fat)), 2), fx(avg(ss.map(s => s.water)), 2), fx(avg(ss.map(s => s.cal)), 0)])
+    .sort((a, b) => lvlOrd(a[0]) - lvlOrd(b[0]) || cmp(a[1], b[1])),
+  Q11: () => { const a = avg(S.map(s => s.cal)); return [...groupBy(S.filter(s => s.cal > a), s => s.t)].map(([t, ss]) => [t, ss.length]).sort((x, y) => y[1] - x[1]); },
+  Q12: () => { const mx = new Map(); for (const s of S) mx.set(s.t, Math.max(mx.get(s.t) || 0, s.cal));
+    return S.filter(s => s.cal === mx.get(s.t)).sort((a, b) => b.cal - a.cal || ci(name(a.m), name(b.m))).map(s => [s.t, name(s.m), s.m.lvl, s.cal]); },
+  Q13: () => { const pa = new Map([...groupBy(M, m => m.plan)].map(([p, ms]) => [p, avg(ms.map(m => m.freq))]));
+    return [...groupBy(M.filter(m => m.freq > pa.get(m.plan) && byMember.has(m.id)), m => P.get(m.plan).name)].map(([p, ms]) => [p, ms.length]).sort((a, b) => b[1] - a[1]); },
+  Q14: () => { let run = 0; return [...groupBy(S, s => s.date.slice(0, 7))].sort((a, b) => cmp(a[0], b[0]))
+    .map(([k, ss]) => [k, ss.length, ss.reduce((a, s) => a + s.cal, 0), run += ss.length]); },
+  Q15: () => { const out = [];
+    for (const l of LEVELS) {
+      const r = S.filter(s => s.m.lvl === l).map(s => ({ s, cph: s.cal / s.dur })).sort((a, b) => b.cph - a.cph);
+      r.forEach((x, i) => x.rank = i && x.cph === r[i - 1].cph ? r[i - 1].rank : i + 1); // RANK(): ties share, next rank skips
+      r.filter(x => x.rank <= 3).sort((a, b) => a.rank - b.rank || ci(name(a.s.m), name(b.s.m))).forEach(x => out.push([l, name(x.s.m), fx(x.cph, 1), x.rank]));
+    } return out; },
+  Q16: () => { const out = [];
+    for (const p of P.values()) for (const c of BMIC) { const ss = S.filter(s => s.m.plan === p.id && bmiCat(s.m.bmi) === c);
+      if (ss.length) out.push([p.name, c, ss.length, fx(avg(ss.map(s => s.cal)), 0)]); }
+    return out; },
+};
+const COLS = {
+  Q1: ['PlanID', 'PlanName', 'DurationMonths', 'Price', 'PricePerMonth'], Q2: ['MemberID', 'FirstName', 'LastName', 'Age', 'ExperienceLevel', 'PlanName'],
+  Q3: ['SessionID', 'MemberName', 'WorkoutType', 'SessionDate', 'DurationHours', 'CaloriesBurned'], Q4: ['MemberID', 'FirstName', 'LastName', 'Gender', 'WorkoutFrequency'],
+  Q5: ['SessionID', 'FirstName', 'LastName', 'TypeName', 'SessionDate', 'DurationHours', 'MaxBPM'], Q6: ['MemberID', 'FirstName', 'LastName', 'Age', 'BMI', 'FatPercentage'],
+  Q7: ['MemberID', 'FirstName', 'LastName', 'PlanName'], Q8: ['TypeName', 'Sessions', 'AvgHours', 'AvgCalories', 'AvgHeartRate'],
+  Q9: ['PlanName', 'Members', 'TotalRevenue', 'AvgDaysPerWeek'], Q10: ['ExperienceLevel', 'Gender', 'Members', 'AvgFatPct', 'AvgWaterL', 'AvgCalories'],
+  Q11: ['TypeName', 'AboveAvgSessions'], Q12: ['TypeName', 'MemberName', 'ExperienceLevel', 'CaloriesBurned'], Q13: ['PlanName', 'AboveAvgMembers'],
+  Q14: ['YearMonth', 'Sessions', 'TotalCalories', 'RunningSessions'], Q15: ['ExperienceLevel', 'MemberName', 'CaloriesPerHour', 'LevelRank'],
+  Q16: ['PlanName', 'BMICategory', 'Members', 'AvgCalories'],
+};
+const SECTIONS = { Q1: 'Basic: joins, filters, ordering', Q8: 'Intermediate: grouping and subqueries', Q14: 'Advanced: CTEs, windows, views' };
+const KW = /\b(SELECT|FROM|JOIN|LEFT|ON|WHERE|AND|OR|IN|NOT|EXISTS|GROUP BY|HAVING|ORDER BY|LIMIT|AS|DESC|BETWEEN|IS NULL|INSERT INTO|VALUES|WITH|OVER|PARTITION BY|CASE|WHEN|THEN|ELSE|END|CREATE OR REPLACE VIEW|DELETE|COUNT|AVG|SUM|MAX|ROUND|CONCAT|RANK|FIELD|DATE_FORMAT)\b/g;
+const hl = sql => sql.split('\n').map(l => l.trimStart().startsWith('--') ? `<span style="color:var(--muted)">${esc(l)}</span>` : esc(l).replace(KW, '<span class="kw">$1</span>')).join('\n');
+let curQ = 'Q1';
+const INSIGHT = { // result lines from the team's presentation
+  Q3: 'Top session: Robert Nguyen, Strength, 1,783 kcal.', Q4: '34 Expert members on Premium plans train 4 or more days a week.',
+  Q6: 'High-BMI members are flagged for trainer follow-up.', Q7: 'Detects the new, inactive member: Jordan Reyes.',
+  Q8: 'HIIT 919, Strength 911 and Yoga 905 kcal on average. Cardio falls below the 900 kcal cut.', Q9: 'Standard leads with $46,946.87 from 313 members.',
+  Q12: 'One top performer each for Strength, HIIT, Cardio and Yoga, all Expert level.', Q14: 'The running total reaches 950 sessions by December 2025.',
+  Q15: 'The most efficient trainees in each experience tier, by kcal per hour.', Q16: 'Compares BMI tiers across the Basic, Standard and Premium plans.',
+};
+
+function queries() {
+  $('#app').innerHTML = `
+    <div><h1>Query pack</h1><p class="sub">The 17 Phase 3 queries from Team05_GymFlow_Queries.sql. Each result is recomputed in the browser from the loaded tables, using the same filters, grouping and sort order as the SQL.</p></div>
+    <div class="qp"><div class="qlist" role="list">${D.queries.map(q => `${SECTIONS[q.id] ? `<div class="sec">${SECTIONS[q.id]}</div>` : ''}
+      <button data-q="${q.id}" aria-pressed="${q.id === curQ}"><b>${q.id}</b><span>${esc(q.title.replace(/\s*\(.*\)$/, ''))}</span></button>`).join('')}</div>
+    <div class="card" id="qout"></div></div>`;
+  document.querySelectorAll('.qlist button').forEach(b => b.onclick = () => { curQ = b.dataset.q; document.querySelectorAll('.qlist button').forEach(x => x.setAttribute('aria-pressed', x === b)); showQ(); });
+  showQ();
+}
+async function showQ() {
+  const q = D.queries.find(x => x.id === curQ);
+  let res;
+  if (LIVE) {
+    $('#qout').innerHTML = `<div><span class="eyebrow">${q.id}</span><h2>${esc(q.title)}</h2></div><p class="sub">Running on MySQL…</p>`;
+    const r = await api('api/query', { id: q.id });
+    if (curQ !== q.id) return;
+    if (r.statements) res = r.statements.map(s => s.error ? `<div class="err"><span class="eyebrow">${esc(s.sql.slice(0, 60))}…</span><code>${esc(s.error)}</code></div>`
+      : `<div class="ok"><span class="eyebrow">${esc(s.sql.slice(0, 60))}…</span><code>${esc(s.ok)} (rolled back)</code></div>`).join('') + '<p class="sub">Both statements ran on your MySQL server inside a transaction that is always rolled back.</p>';
+    else if (r.error) res = `<div class="err"><span class="eyebrow">MySQL error</span><code>${esc(r.error)}</code></div>`;
+    else res = table(r.cols, r.rows, 'returned by MySQL');
+  } else if (q.id === 'Q17') res = `<div class="err"><span class="eyebrow">INSERT with AvgBPM 170 above MaxBPM 160</span><code>Error Code: 3819. Check constraint 'chk_heart_rate' is violated.</code></div>
+    <div class="err"><span class="eyebrow">DELETE the Basic plan (PlanID 1)</span><code>Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails (fk_member_plan)</code></div>
+    <p class="sub">Both statements are expected to fail. The schema rejects the bad heart-rate reading and refuses to delete a plan that members still use.</p>`;
+  else res = table(COLS[q.id], Q[q.id](), 'computed from snapshot');
+  $('#qout').innerHTML = `<div><span class="eyebrow">${q.id}</span><h2>${esc(q.title)}</h2><p class="sub">${esc(q.purpose)}</p></div><pre>${hl(q.sql)}</pre>${INSIGHT[q.id] ? `<div class="ok"><span class="eyebrow">Insight</span><span class="insight">${INSIGHT[q.id]}</span></div>` : ''}${res}`;
+  $('#qout').animate([{ opacity: 0, transform: reduce ? 'none' : 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+}
+function table(cols, rows, src) {
+    const num = cols.map((_, i) => rows.length && rows.every(r => typeof r[i] === 'number' || /^-?[\d.]+$/.test(r[i])) && !/ID$|YearMonth/.test(cols[i]) || /ID$/.test(cols[i]));
+    return `<div class="eyebrow">${rows.length} row${rows.length === 1 ? '' : 's'} ${src}</div>
+    <div class="tablebox"><table><thead><tr>${cols.map((c, i) => `<th class="${num[i] ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map((v, i) => `<td class="${num[i] ? 'n' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+</script>
+</body>
+</html>
